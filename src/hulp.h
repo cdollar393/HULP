@@ -31,20 +31,6 @@ typedef enum {
 } ulp_state_t;
 
 /**
- * ADC bit width definition for multiple versions of IDF.
- *
- * ESP IDF changed the ADC driver in IDF v5 to use slightly different type
- * names for ADC bit width as compared to previous versions (i.e.
- * adc_bits_width_t was changed to adc_bitwidth_t). This type definition simply
- * wraps that change for convenience.
- */
-#if ESP_IDF_VERSION_MAJOR >= 5
-    typedef adc_bitwidth_t hulp_adc_bitwidth_t;
-#else
-    typedef adc_bits_width_t hulp_adc_bitwidth_t;
-#endif
-
-/**
  * Initialise and configure a pin for ULP GPIO.
  *
  * pin: GPIO pin (eg. GPIO_NUM_4)
@@ -54,15 +40,26 @@ typedef enum {
  */
 esp_err_t hulp_configure_pin(gpio_num_t pin, rtc_gpio_mode_t mode, gpio_pull_mode_t pull_mode, uint32_t level);
 
+#if ESP_IDF_VERSION_MAJOR >= 5
+/**
+ * Initialise and configure a pin for ULP analog input
+ *
+ * handle: ADC one-shot handle (output param)
+ * pin: GPIO pin (eg. GPIO_NUM_32)
+ * attenuation: Channel attenuation, one of ADC_ATTEN_DB_0, ADC_ATTEN_DB_2_5, ADC_ATTEN_DB_6 or ADC_ATTEN_DB_11
+ * width: Bit capture width, one of ADC_BITWIDTH_9, ADC_BITWIDTH_10, ADC_BITWIDTH_11 or ADC_BITWIDTH_12
+ */
+esp_err_t hulp_configure_analog_pin(adc_oneshot_unit_handle_t *handle, gpio_num_t pin, adc_atten_t attenuation, adc_bitwidth_t width);
+#else
 /**
  * Initialise and configure a pin for ULP analog input
  *
  * pin: GPIO pin (eg. GPIO_NUM_32)
  * attenuation: Channel attenuation, one of ADC_ATTEN_DB_0, ADC_ATTEN_DB_2_5, ADC_ATTEN_DB_6 or ADC_ATTEN_DB_11
- * width: Bit capture width, for IDF <v5, one of ADC_WIDTH_BIT_9, ADC_WIDTH_BIT_10, ADC_WIDTH_BIT_11 or ADC_WIDTH_BIT_12,
- *    or for IDF >v5, one of ADC_BITWIDTH_9, ADC_BITWIDTH_10, ADC_BITWIDTH_11 or ADC_BITWIDTH_12
+ * width: Bit capture width, one of ADC_WIDTH_BIT_9, ADC_WIDTH_BIT_10, ADC_WIDTH_BIT_11 or ADC_WIDTH_BIT_12
  */
-esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hulp_adc_bitwidth_t width);
+esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, adc_bits_width_t width);
+#endif
 
 /**
  * Prepares GPIOs for use with ULP hardware I2C.

@@ -66,7 +66,8 @@ int hulp_adc_get_channel_num(gpio_num_t pin)
     return -1;
 }
 
-esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hulp_adc_bitwidth_t width)
+#if ESP_IDF_VERSION_MAJOR >= 5
+esp_err_t hulp_configure_analog_pin(adc_oneshot_unit_handle_t *handle, gpio_num_t pin, adc_atten_t attenuation, adc_bitwidth_t width)
 {
     int adc_unit_index = hulp_adc_get_periph_index(pin);
     int adc_channel = hulp_adc_get_channel_num(pin);
@@ -77,8 +78,6 @@ esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hul
         return ESP_ERR_INVALID_ARG;
     }
 
-#if ESP_IDF_VERSION_MAJOR >= 5
-    adc_oneshot_unit_handle_t adc_handle;
     adc_oneshot_unit_init_cfg_t adc_unit_config = {
         .unit_id = adc_unit_index == 0 ? ADC_UNIT_1 : ADC_UNIT_2,
         .ulp_mode = ADC_ULP_MODE_FSM,
@@ -87,9 +86,22 @@ esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hul
         .bitwidth = width,
         .atten = attenuation,
     };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&adc_unit_config, &adc_handle));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, (adc_channel_t)adc_channel, &adc_chan_config));
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&adc_unit_config, handle));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(*handle, (adc_channel_t)adc_channel, &adc_chan_config));
+    return ESP_OK;
+}
 #else
+esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, adc_bits_width_t width)
+{
+    int adc_unit_index = hulp_adc_get_periph_index(pin);
+    int adc_channel = hulp_adc_get_channel_num(pin);
+
+    if(adc_unit_index < 0 || adc_channel < 0)
+    {
+        ESP_LOGE(TAG, "invalid ADC pin %d (%d, %d)", pin, adc_unit_index, adc_channel);
+        return ESP_ERR_INVALID_ARG;
+    }
+
     if(adc_unit_index == 0)
     {
         adc1_config_channel_atten((adc1_channel_t)adc_channel, attenuation); //Does adc_gpio_init() internally
@@ -109,9 +121,9 @@ esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hul
         REG_CLR_BIT(SENS_SAR_READ_CTRL2_REG, SENS_SAR2_PWDET_FORCE);
         // REG_SET_BIT(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_SAR2_MUX);
     }
-#endif
     return ESP_OK;
 }
+#endif
 
 #define RTCIO_FUNC_RTC_I2C 0x3
 
