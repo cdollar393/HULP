@@ -1,9 +1,14 @@
 #ifndef HULP_H
 #define HULP_H
 
+#include "esp_idf_version.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
-#include "driver/adc.h"
+#if ESP_IDF_VERSION_MAJOR >= 5
+#   include "ulp_adc.h"
+#else
+#   include "driver/adc.h"
+#endif
 
 #include "hulp_compat.h"
 #include "hulp_types.h"
@@ -26,6 +31,20 @@ typedef enum {
 } ulp_state_t;
 
 /**
+ * ADC bit width definition for multiple versions of IDF.
+ *
+ * ESP IDF changed the ADC driver in IDF v5 to use slightly different type
+ * names for ADC bit width as compared to previous versions (i.e.
+ * adc_bits_width_t was changed to adc_bitwidth_t). This type definition simply
+ * wraps that change for convenience.
+ */
+#if ESP_IDF_VERSION_MAJOR >= 5
+    typedef adc_bitwidth_t hulp_adc_bitwidth_t;
+#else
+    typedef adc_bits_width_t hulp_adc_bitwidth_t;
+#endif
+
+/**
  * Initialise and configure a pin for ULP GPIO.
  *
  * pin: GPIO pin (eg. GPIO_NUM_4)
@@ -40,9 +59,10 @@ esp_err_t hulp_configure_pin(gpio_num_t pin, rtc_gpio_mode_t mode, gpio_pull_mod
  *
  * pin: GPIO pin (eg. GPIO_NUM_32)
  * attenuation: Channel attenuation, one of ADC_ATTEN_DB_0, ADC_ATTEN_DB_2_5, ADC_ATTEN_DB_6 or ADC_ATTEN_DB_11
- * width: Bit capture width, one of ADC_WIDTH_BIT_9, ADC_WIDTH_BIT_10, ADC_WIDTH_BIT_11 or ADC_WIDTH_BIT_12
+ * width: Bit capture width, for IDF <v5, one of ADC_WIDTH_BIT_9, ADC_WIDTH_BIT_10, ADC_WIDTH_BIT_11 or ADC_WIDTH_BIT_12,
+ *    or for IDF >v5, one of ADC_BITWIDTH_9, ADC_BITWIDTH_10, ADC_BITWIDTH_11 or ADC_BITWIDTH_12
  */
-esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, adc_bits_width_t width);
+esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hulp_adc_bitwidth_t width);
 
 /**
  * Prepares GPIOs for use with ULP hardware I2C.

@@ -9,11 +9,12 @@
 #include "driver/gpio.h"
 #if ESP_IDF_VERSION_MAJOR >= 5
 #   include "esp_private/rtc_ctrl.h"
+#   include "ulp_adc.h"
 #else
 #   include "driver/rtc_cntl.h"
+#   include "driver/adc.h"
 #endif
 #include "driver/rtc_io.h"
-#include "driver/adc.h"
 #include "soc/rtc.h"
 #include "soc/adc_periph.h"
 
@@ -65,7 +66,7 @@ int hulp_adc_get_channel_num(gpio_num_t pin)
     return -1;
 }
 
-esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, adc_bits_width_t width)
+esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, hulp_adc_bitwidth_t width)
 {
     int adc_unit_index = hulp_adc_get_periph_index(pin);
     int adc_channel = hulp_adc_get_channel_num(pin);
@@ -76,6 +77,16 @@ esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, adc
         return ESP_ERR_INVALID_ARG;
     }
 
+#if ESP_IDF_VERSION_MAJOR >= 5
+    ulp_adc_cfg_t cfg = {
+        .adc_n    = adc_unit_index == 0 ? ADC_UNIT_1 : ADC_UNIT_2,
+        .channel  = (adc_channel_t)adc_channel,
+        .width    = width,
+        .atten    = attenuation,
+        .ulp_mode = ADC_ULP_MODE_FSM,
+    };
+    ESP_ERROR_CHECK(ulp_adc_init(&cfg));
+#else
     if(adc_unit_index == 0)
     {
         adc1_config_channel_atten((adc1_channel_t)adc_channel, attenuation); //Does adc_gpio_init() internally
@@ -95,6 +106,7 @@ esp_err_t hulp_configure_analog_pin(gpio_num_t pin, adc_atten_t attenuation, adc
         REG_CLR_BIT(SENS_SAR_READ_CTRL2_REG, SENS_SAR2_PWDET_FORCE);
         // REG_SET_BIT(SYSCON_SARADC_CTRL_REG, SYSCON_SARADC_SAR2_MUX);
     }
+#endif
     return ESP_OK;
 }
 
@@ -200,6 +212,11 @@ void hulp_peripherals_on(void)
 
 void hulp_configure_hall_effect_sensor(void)
 {
+#if ESP_IDF_VERSION_MAJOR >= 5
+    // ESP IDF v5 no longer supports hall sensor
+    // see: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/migration-guides/release-5.x/5.0/peripherals.html#api-changes
+    ESP_LOGE(TAG, "IDF >v5 no longer supports hall effect sensor");
+#else
     //GPIO 36
     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_6);
     //GPIO 39
@@ -210,6 +227,7 @@ void hulp_configure_hall_effect_sensor(void)
     REG_SET_BIT(SENS_SAR_TOUCH_CTRL1_REG, SENS_XPD_HALL_FORCE);
     //Connect sensor to 36 and 39
     REG_SET_BIT(RTC_IO_HALL_SENS_REG, RTC_IO_XPD_HALL);
+#endif
 }
 
 static uint64_t hulp_us_to_ticks(uint64_t time_us)
